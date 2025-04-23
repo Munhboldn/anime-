@@ -1,59 +1,55 @@
-# app.py (Streamlit app using FastAI model)
 import streamlit as st
 st.set_page_config(page_title="🎬 Anime Recommender", layout="wide")
 
 import pandas as pd
 import os
 import urllib.request
-from fastai.learner import load_learner
+from pathlib import Path
+import logging
+from recommend_fastai import load_model, recommend_anime_fastai
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Model and dataset paths
 MODEL_URL = "https://www.dropbox.com/scl/fi/ucp9m89b244cmsp61cax4/anime_recommender_fastai.pkl?rlkey=lt2awixz2e60wgyngh318h6rt&st=vlcosxta&raw=1"
 MODEL_PATH = "anime_recommender_fastai.pkl"
+DATASET_PATH = "anime-dataset-2023.csv"
 
-if not os.path.exists(MODEL_PATH):
-    with st.spinner("📦 Downloading model..."):
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+# Load dataset
+try:
+    anime_df = pd.read_csv(DATASET_PATH)
+    anime_df = anime_df[['anime_id', 'Name', 'Score', 'Genres', 'Type', 'Episodes']]
+    anime_df['Score'] = pd.to_numeric(anime_df['Score'], errors='coerce')
+    logger.info("Successfully loaded anime dataset")
+except Exception as e:
+    logger.error(f"Failed to load dataset: {e}")
+    st.error(f"🚫 Failed to load anime dataset: {e}")
+    st.stop()
 
-learn = load_learner(MODEL_PATH)
-dls = learn.dls
+# Download model if not exists
+try:
+    if not os.path.exists(MODEL_PATH):
+        with st.spinner("📦 Downloading model..."):
+            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+            logger.info(f"Downloaded model to {MODEL_PATH}")
+except Exception as e:
+    logger.error(f"Failed to download model: {e}")
+    st.error(f"🚫 Failed to download model: {e}")
+    st.stop()
 
-def recommend_anime_fastai(user_id, top_n=10, min_score=7.0):
-    try:
-        if user_id not in dls.classes['user_id']:
-            return pd.DataFrame(columns=["Name", "Score", "Genres", "Type", "Episodes", "pred_rating"])
+# Load model
+try:
+    learn = load_model(MODEL_PATH)  # Uses str(Path(MODEL_PATH)) internally
+    dls = learn.dls
+    logger.info("Successfully loaded model")
+except Exception as e:
+    logger.error(f"Failed to load model: {e}")
+    st.error(f"🚫 Failed to load model: {e}")
+    st.stop()
 
-        max_valid_index = learn.model.i_weight.num_embeddings
-        valid_anime_ids = dls.classes['anime_id'][:max_valid_index]
-
-        df = pd.DataFrame({
-            'user_id': [user_id] * len(valid_anime_ids),
-            'anime_id': valid_anime_ids
-        })
-
-        df['user_id'] = pd.Categorical(df['user_id'], categories=dls.classes['user_id'])
-        df['anime_id'] = pd.Categorical(df['anime_id'], categories=dls.classes['anime_id'])
-
-        df = df[df['user_id'].notna() & df['anime_id'].notna()]
-        df_encoded = df.copy()
-        df_encoded['user_id'] = df['user_id'].cat.codes
-        df_encoded['anime_id'] = df['anime_id'].cat.codes
-
-        test_dl = dls.test_dl(df_encoded)
-        preds, _ = learn.get_preds(dl=test_dl)
-        df['pred_rating'] = preds.numpy()
-
-        anime_df = pd.read_csv("anime-dataset-2023.csv")
-        anime_df['Score'] = pd.to_numeric(anime_df['Score'], errors='coerce')
-        anime_df = anime_df[['anime_id', 'Name', 'Score', 'Genres', 'Type', 'Episodes']]
-        merged = df.merge(anime_df, on='anime_id', how='left')
-        merged = merged[merged['Score'] >= min_score]
-
-        return merged.sort_values('pred_rating', ascending=False).head(top_n)
-    except Exception as e:
-        st.error(f"🚫 Internal error: {e}")
-        return pd.DataFrame(columns=["Name", "Score", "Genres", "Type", "Episodes", "pred_rating"])
-
-# Theme toggle (moved outside sidebar for faster responsiveness)
+# Theme toggle
 mode = st.sidebar.radio("🌗 Theme Mode", ["Light", "Dark"], key="theme_mode")
 if mode == "Dark":
     st.markdown("""
@@ -65,12 +61,13 @@ if mode == "Dark":
             .stButton > button {
                 background-color: #4CAF50; color: white;
             }
-            .stTextInput > div > input {
+            .stTextInput > div > input, .stSelectbox > div > select {
                 background-color: #333; color: white;
             }
         </style>
     """, unsafe_allow_html=True)
 
+# Streamlit UI
 st.title("🎌 Welcome to Your Anime Recommendation Portal")
 st.markdown("Easily find anime you might love — based on your past ratings")
 
@@ -84,26 +81,29 @@ with st.sidebar:
     submit = st.button("📥 Recommend", key="submit_btn")
 
 if submit:
-    user_id = int(user_id_input)
-    with st.spinner("🔎 Searching for the best anime for you..."):
-        recs = recommend_anime_fastai(user_id, top_n, min_score)
+    try:
+        user_id = user_id_input  # Keep as string to avoid int conversion issues
+        with st.spinner("🔎 Searching for the best anime for you..."):
+            recs = recommend_anime_fastai(user_id, top_n, min_score, anime_df=anime_df)
 
-    if recs.empty:
-        st.warning("⚠️ No recommendations found. Showing popular anime instead.")
-        recs = pd.read_csv("anime-dataset-2023.csv")
-        recs = recs[['Name', 'Score', 'Genres', 'Type', 'Episodes']].sort_values(by='Score', ascending=False).head(top_n)
-        recs['pred_rating'] = recs['Score']
-    else:
-        st.success(f"✅ Top {len(recs)} personalized picks for User ID {user_id}:")
+        if recs.empty:
+            st.warning("⚠️ No recommendations found. Showing popular anime instead.")
+            recs = anime_df.sort_values(by='Score', ascending=False).head(top_n)
+            recs['pred_rating'] = recs['Score']
+        else:
+            st.success(f"✅ Top {len(recs)} personalized picks for User ID {user_id}:")
 
-    if anime_search:
-        recs = recs[recs['Name'].str.contains(anime_search, case=False, na=False)]
-        st.info(f"🔍 Found {len(recs)} matches for '{anime_search}'")
+        if anime_search:
+            recs = recs[recs['Name'].str.contains(anime_search, case=False, na=False)]
+            st.info(f"🔍 Found {len(recs)} matches for '{anime_search}'")
 
-    # Expandable anime cards
-    for i, row in recs.iterrows():
-        with st.expander(f"{i+1}. {row['Name']} ({row['pred_rating']:.2f}/10)", expanded=False):
-            st.write(f"⭐ **Predicted Rating:** {row['pred_rating']:.2f}/10")
-            st.write(f"🎯 **MAL Score:** {row['Score']}")
-            st.write(f"🎭 **Genres:** {row['Genres']}")
-            st.write(f"📺 **Type:** {row['Type']} | 📦 **Episodes:** {row['Episodes']}")
+        # Expandable anime cards
+        for i, row in recs.iterrows():
+            with st.expander(f"{i+1}. {row['Name']} ({row['pred_rating']:.2f}/10)", expanded=False):
+                st.write(f"⭐ **Predicted Rating:** {row['pred_rating']:.2f}/10")
+                st.write(f"🎯 **MAL Score:** {row['Score']}")
+                st.write(f"🎭 **Genres:** {row['Genres']}")
+                st.write(f"📺 **Type:** {row['Type']} | 📦 **Episodes:** {row['Episodes']}")
+    except Exception as e:
+        logger.error(f"Recommendation error: {e}")
+        st.error(f"🚫 Error generating recommendations: {e}")
