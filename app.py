@@ -3,14 +3,54 @@ import streamlit as st
 st.set_page_config(page_title="🎬 Anime Recommender", layout="wide")
 
 import pandas as pd
+import os, urllib.request
 from fastai.learner import load_learner
-from recommend_fastai import recommend_anime_fastai, dls
 
-@st.cache_resource
-def load_model():
-    return recommend_anime_fastai, dls
+MODEL_URL = "https://drive.google.com/uc?export=download&id=1FVOWwJ1kCxRFgMedmWyLWpacjx43oGyD"
+MODEL_PATH = "anime_recommender_fastai.pkl"
 
-recommend_anime_fastai, dls = load_model()
+if not os.path.exists(MODEL_PATH):
+    with st.spinner("📦 Downloading model..."):
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+
+learn = load_learner(MODEL_PATH)
+dls = learn.dls
+
+def recommend_anime_fastai(user_id, top_n=10, min_score=7.0):
+    try:
+        if user_id not in dls.classes['user_id']:
+            return pd.DataFrame(columns=["Name", "Score", "Genres", "Type", "Episodes", "pred_rating"])
+
+        max_valid_index = learn.model.i_weight.num_embeddings
+        valid_anime_ids = dls.classes['anime_id'][:max_valid_index]
+
+        df = pd.DataFrame({
+            'user_id': [user_id] * len(valid_anime_ids),
+            'anime_id': valid_anime_ids
+        })
+
+        df['user_id'] = pd.Categorical(df['user_id'], categories=dls.classes['user_id'])
+        df['anime_id'] = pd.Categorical(df['anime_id'], categories=dls.classes['anime_id'])
+
+        df = df[df['user_id'].notna() & df['anime_id'].notna()]
+        df_encoded = df.copy()
+        df_encoded['user_id'] = df['user_id'].cat.codes
+        df_encoded['anime_id'] = df['anime_id'].cat.codes
+
+        test_dl = dls.test_dl(df_encoded)
+        preds, _ = learn.get_preds(dl=test_dl)
+        df['pred_rating'] = preds.numpy()
+
+        anime_df = pd.read_csv("anime-dataset-2023.csv")
+        anime_df['Score'] = pd.to_numeric(anime_df['Score'], errors='coerce')
+        anime_df = anime_df[['anime_id', 'Name', 'Score', 'Genres', 'Type', 'Episodes']]
+        merged = df.merge(anime_df, on='anime_id', how='left')
+        merged = merged[merged['Score'] >= min_score]
+
+        return merged.sort_values('pred_rating', ascending=False).head(top_n)
+    except Exception as e:
+        st.error(f"🚫 Internal error: {e}")
+        return pd.DataFrame(columns=["Name", "Score", "Genres", "Type", "Episodes", "pred_rating"])
 
 # Theme toggle (moved outside sidebar for faster responsiveness)
 mode = st.sidebar.radio("🌗 Theme Mode", ["Light", "Dark"], key="theme_mode")
