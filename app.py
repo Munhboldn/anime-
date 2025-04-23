@@ -5,14 +5,18 @@ st.set_page_config(page_title="🎬 Anime Recommender", layout="wide")
 import pandas as pd
 import os
 import gdown
+import zipfile
 from fastai.learner import load_learner
 
-MODEL_URL = "https://drive.google.com/uc?id=1mchVb5zKND4Da0WjKeOsrYpesGRE4Gyt"
+MODEL_URL = "https://drive.google.com/uc?id=19dC7T4LirIZEZUL1FYM0rua7yMCcV2cb"
+MODEL_ZIP = "model.zip"
 MODEL_PATH = "anime_recommender_fastai.pkl"
 
 if not os.path.exists(MODEL_PATH):
-    with st.spinner("📦 Downloading model..."):
-        gdown.download(MODEL_URL, MODEL_PATH, quiet=False, fuzzy=True)
+    with st.spinner("📦 Downloading and extracting model..."):
+        gdown.download(MODEL_URL, MODEL_ZIP, quiet=False, fuzzy=True)
+        with zipfile.ZipFile(MODEL_ZIP, 'r') as zip_ref:
+            zip_ref.extractall()
 
 learn = load_learner(MODEL_PATH)
 dls = learn.dls
@@ -53,7 +57,7 @@ def recommend_anime_fastai(user_id, top_n=10, min_score=7.0):
         st.error(f"🚫 Internal error: {e}")
         return pd.DataFrame(columns=["Name", "Score", "Genres", "Type", "Episodes", "pred_rating"])
 
-# Theme toggle (moved outside sidebar for faster responsiveness)
+# Theme toggle
 mode = st.sidebar.radio("🌗 Theme Mode", ["Light", "Dark"], key="theme_mode")
 if mode == "Dark":
     st.markdown("""
@@ -100,7 +104,6 @@ if submit:
         recs = recs[recs['Name'].str.contains(anime_search, case=False, na=False)]
         st.info(f"🔍 Found {len(recs)} matches for '{anime_search}'")
 
-    # Expandable anime cards
     for i, row in recs.iterrows():
         with st.expander(f"{i+1}. {row['Name']} ({row['pred_rating']:.2f}/10)", expanded=False):
             st.write(f"⭐ **Predicted Rating:** {row['pred_rating']:.2f}/10")
