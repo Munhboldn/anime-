@@ -8,7 +8,7 @@ import gdown
 import zipfile
 from fastai.learner import load_learner
 
-MODEL_URL = "https://drive.google.com/uc?id=19dC7T4LirIZEZUL1FYM0rua7yMCcV2cb"
+MODEL_URL = "https://drive.google.com/uc?export=download&id=19dC7T4LirIZEZUL1FYM0rua7yMCcV2cb"
 MODEL_ZIP = "model.zip"
 MODEL_PATH = "anime_recommender_fastai.pkl"
 
@@ -57,7 +57,7 @@ def recommend_anime_fastai(user_id, top_n=10, min_score=7.0):
         st.error(f"🚫 Internal error: {e}")
         return pd.DataFrame(columns=["Name", "Score", "Genres", "Type", "Episodes", "pred_rating"])
 
-# Theme toggle
+# Theme toggle (moved outside sidebar for faster responsiveness)
 mode = st.sidebar.radio("🌗 Theme Mode", ["Light", "Dark"], key="theme_mode")
 if mode == "Dark":
     st.markdown("""
@@ -104,6 +104,7 @@ if submit:
         recs = recs[recs['Name'].str.contains(anime_search, case=False, na=False)]
         st.info(f"🔍 Found {len(recs)} matches for '{anime_search}'")
 
+    # Expandable anime cards
     for i, row in recs.iterrows():
         with st.expander(f"{i+1}. {row['Name']} ({row['pred_rating']:.2f}/10)", expanded=False):
             st.write(f"⭐ **Predicted Rating:** {row['pred_rating']:.2f}/10")
