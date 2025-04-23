@@ -7,7 +7,7 @@ import os
 import gdown
 from fastai.learner import load_learner
 
-MODEL_URL = "https://drive.google.com/uc?id=1FVOWwJ1kCxRFgMedmWyLWpacjx43oGyD"
+MODEL_URL = "https://drive.google.com/uc?id=1mchVb5zKND4Da0WjKeOsrYpesGRE4Gyt"
 MODEL_PATH = "anime_recommender_fastai.pkl"
 
 if not os.path.exists(MODEL_PATH):
