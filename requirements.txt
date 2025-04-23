@@ -4,5 +4,3 @@ scikit-learn==1.6.1
 torch==2.6.0
 fastai==2.7.12
 fastcore==1.5.29
-# Force override
---force-reinstall
