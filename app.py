@@ -4,17 +4,15 @@ st.set_page_config(page_title="🎬 Anime Recommender", layout="wide")
 
 import pandas as pd
 import os
+import urllib.request
 from fastai.learner import load_learner
 
-MODEL_URL = "https://www.dropbox.com/scl/fi/ucp9m89b244cmsp61cax4/anime_recommender_fastai.pkl?rlkey=lt2awixz2e60wgyngh318h6rt&st=95neuj26&dl=1"
+MODEL_URL = "https://www.dropbox.com/scl/fi/ucp9m89b244cmsp61cax4/anime_recommender_fastai.pkl?rlkey=lt2awixz2e60wgyngh318h6rt&st=vlcosxta&raw=1"
 MODEL_PATH = "anime_recommender_fastai.pkl"
-
-import urllib.request
 
 if not os.path.exists(MODEL_PATH):
     with st.spinner("📦 Downloading model..."):
         urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-
 
 learn = load_learner(MODEL_PATH)
 dls = learn.dls
