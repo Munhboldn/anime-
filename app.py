@@ -3,15 +3,16 @@ import streamlit as st
 st.set_page_config(page_title="🎬 Anime Recommender", layout="wide")
 
 import pandas as pd
-import os, urllib.request
+import os
+import gdown
 from fastai.learner import load_learner
 
-MODEL_URL = "https://drive.google.com/uc?export=download&id=1FVOWwJ1kCxRFgMedmWyLWpacjx43oGyD"
+MODEL_URL = "https://drive.google.com/uc?id=1FVOWwJ1kCxRFgMedmWyLWpacjx43oGyD"
 MODEL_PATH = "anime_recommender_fastai.pkl"
 
 if not os.path.exists(MODEL_PATH):
     with st.spinner("📦 Downloading model..."):
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
 
 learn = load_learner(MODEL_PATH)
 dls = learn.dls
