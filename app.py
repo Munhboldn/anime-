@@ -4,19 +4,17 @@ st.set_page_config(page_title="🎬 Anime Recommender", layout="wide")
 
 import pandas as pd
 import os
-import gdown
-import zipfile
 from fastai.learner import load_learner
 
-MODEL_URL = "https://drive.google.com/uc?export=download&id=19dC7T4LirIZEZUL1FYM0rua7yMCcV2cb"
-MODEL_ZIP = "model.zip"
+MODEL_URL = "https://www.dropbox.com/scl/fi/ucp9m89b244cmsp61cax4/anime_recommender_fastai.pkl?rlkey=lt2awixz2e60wgyngh318h6rt&st=95neuj26&dl=1"
 MODEL_PATH = "anime_recommender_fastai.pkl"
 
+import urllib.request
+
 if not os.path.exists(MODEL_PATH):
-    with st.spinner("📦 Downloading and extracting model..."):
-        gdown.download(MODEL_URL, MODEL_ZIP, quiet=False, fuzzy=True)
-        with zipfile.ZipFile(MODEL_ZIP, 'r') as zip_ref:
-            zip_ref.extractall()
+    with st.spinner("📦 Downloading model..."):
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+
 
 learn = load_learner(MODEL_PATH)
 dls = learn.dls
