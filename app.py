@@ -12,7 +12,7 @@ MODEL_PATH = "anime_recommender_fastai.pkl"
 
 if not os.path.exists(MODEL_PATH):
     with st.spinner("📦 Downloading model..."):
-        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False, fuzzy=True)
 
 learn = load_learner(MODEL_PATH)
 dls = learn.dls
